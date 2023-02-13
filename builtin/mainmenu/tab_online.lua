@@ -1,8 +1,11 @@
 -- Matematica Superpiatta's environment
 
 SERVER_ADDRESS = "mt.matematicasuperpiatta.it"
---SERVER_ADDRESS = "0.0.0.0"
-URL_GET = "http://"..SERVER_ADDRESS..":29999"
+SERVER_PORT = 29999
+URL_GET = "http://"..SERVER_ADDRESS..":"..SERVER_PORT
+
+SERVICE_DISCOVERY = "swissknife.raspberryip.com"
+SERVICE_URL = "https://"..SERVICE_DISCOVERY.."/"
 
 local http = core.get_http_api()
 
@@ -10,11 +13,26 @@ local function spawnPort()
 --  GET PORT NUMBER BY HTTP REQUEST - START
 	local response = http.fetch_sync({ url = URL_GET })
         if not response.succeeded then
-                return
+					-- lazy debug (but also) desperate choice
+                return "30000"
         end
 
 --  GET PORT NUMBER BY HTTP REQUEST - END
 	return response.data
+end
+
+local function check_updates()
+	local url = SERVICE_URL .. "dawn.json"
+	local res = http.fetch_sync({
+		url = url,
+		-- post_data = { version = '0.1', system = 'POSIX', lang = 'it' },
+		timeout = 10
+	})
+	local raw = core.parse_json(res.data)
+	if raw == nil then
+		return { message = "Non sono in grado di collegarmi" }
+	end
+	return raw
 end
 
 
@@ -86,6 +104,8 @@ local function get_formspec(tabview, name, tabdata)
 		tabdata.search_for = ""
 	end
 
+	local update = check_updates()
+
 	local retval =
 		-- Search
 --		"field[0.25,0.25;7,0.75;te_search;;" .. core.formspec_escape(tabdata.search_for) .. "]" ..
@@ -104,6 +124,7 @@ local function get_formspec(tabview, name, tabdata)
 
 		"label[4.35,0.6;" .. fgettext("Matematica Superpiatta ") .. "]" ..
 		"label[4.00,1.3;" .. fgettext("Un videogioco per la scuola") .. "]" ..
+		"label[1.00,2.3;" .. update.news .. "]" ..
 		"label[8.1,4.5;" .. fgettext("Università degli Studi dell'Aquila") .. "]" ..
 		"label[5.75,5.1;" .. fgettext("per informazioni: matematicasuperpiatta@gmail.com") .. "]" ..
 		-- Address / Port
@@ -128,6 +149,7 @@ local function get_formspec(tabview, name, tabdata)
 		-- Connect
 		"button[3,6;2.5,0.75;btn_mp_connect;" .. fgettext("Connect") .. "]"
 
+	--[[
 	if tabdata.selected then
 		if gamedata.fav then
 			retval = retval .. "button[0.25,6;2.5,0.75;btn_delete_favorite;" ..
@@ -138,6 +160,7 @@ local function get_formspec(tabview, name, tabdata)
 				core.formspec_escape(gamedata.serverdescription) .. "]"
 		end
 	end
+	]]--
 
 --	retval = retval .. "container_end[]"
 
@@ -418,9 +441,6 @@ local function main_button_handler(tabview, fields, name, tabdata)
 			})
 		end
 
--- Really? ACe
---		core.settings:set("address",     gamedata.address)
---		core.settings:set("remote_port", gamedata.port)
 		core.settings:set("address",     "")
         core.settings:set("remote_port", "")
 
@@ -435,6 +455,7 @@ local function on_change(type, old_tab, new_tab)
 	if type == "LEAVE" then return end
 	serverlistmgr.sync()
 end
+
 
 return {
 	name = "online",
